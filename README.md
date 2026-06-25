@@ -92,11 +92,10 @@ public class MyGame extends Engine {
 - [x] Entity / Component / Transform system
 - [x] Library publishing (Maven Local)
 - [ ] Logger with per-system log levels
-- [ ] FPS camera + WASD movement
+- [ ] WASD movement
 - [ ] Renderer3D — grid-based dungeon walls
 - [ ] UI / HUD overlay
 - [ ] Framebuffer + post-processing (scanlines, fog)
 - [ ] Scene serialization
 - [ ] Hot reload of game logic
-- [ ] Procedural dungeon generation
 - [ ] Dear ImGui editor integration
