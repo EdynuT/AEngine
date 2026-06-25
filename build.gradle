@@ -1,0 +1,73 @@
+plugins {
+    id 'java-library'
+    id 'application'
+    id 'maven-publish'
+}
+
+group   = 'com.aengine'
+version = '1.0.0'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+ext {
+    lwjglVersion = '3.3.4'
+    jomlVersion  = '1.10.5'
+    lwjglNatives = 'natives-windows'
+}
+
+dependencies {
+    implementation "org.lwjgl:lwjgl:${lwjglVersion}"
+    implementation "org.lwjgl:lwjgl-glfw:${lwjglVersion}"
+    implementation "org.lwjgl:lwjgl-opengl:${lwjglVersion}"
+    implementation "org.lwjgl:lwjgl-stb:${lwjglVersion}"
+
+    // Natives are runtimeOnly in the engine itself; the game project picks its own platform
+    runtimeOnly "org.lwjgl:lwjgl:${lwjglVersion}:${lwjglNatives}"
+    runtimeOnly "org.lwjgl:lwjgl-glfw:${lwjglVersion}:${lwjglNatives}"
+    runtimeOnly "org.lwjgl:lwjgl-opengl:${lwjglVersion}:${lwjglNatives}"
+    runtimeOnly "org.lwjgl:lwjgl-stb:${lwjglVersion}:${lwjglNatives}"
+
+    api "org.joml:joml:${jomlVersion}"
+}
+
+application {
+    mainClass = 'com.aengine.Main'
+}
+
+run {
+    jvmArgs += [
+        '--enable-native-access=ALL-UNNAMED',
+        '--add-opens', 'java.base/java.lang=ALL-UNNAMED',
+        '--add-opens', 'java.base/java.nio=ALL-UNNAMED'
+    ]
+}
+
+// ── Library publishing ────────────────────────────────────────────────────────
+java {
+    withSourcesJar()   // includes source code in the published artifact
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+
+            // Consumers only need implementation deps exposed via 'api'
+            pom {
+                name = 'AEngine'
+                description = 'Java 2D/3D graphics engine (OpenGL 3.3 backend)'
+            }
+        }
+    }
+    repositories {
+        mavenLocal()   // publishes to ~/.m2/repository
+    }
+}
