@@ -48,7 +48,7 @@ public class Camera {
                 new Vector3f(position).add(front),
                 new Vector3f(0, 1, 0));
         }
-        projection.mul(view, viewProjection);
+        viewProjection.set(projection).mul(view);
     }
 
     public void setPosition(float x, float y, float z) { position.set(x, y, z); recalculate(); }

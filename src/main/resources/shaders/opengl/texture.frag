@@ -1,11 +1,20 @@
 #version 330 core
 
-in  vec2 v_TexCoord;
-out vec4 FragColor;
+layout (location = 0) out vec4 color;
 
-uniform sampler2D u_Texture;
-uniform vec4      u_Color;
+in vec2 v_TexCoord;
+in vec4 v_Color;
+in float v_TexIndex;
+
+// Dynamic array length injected at runtime by the engine
+uniform sampler2D u_Textures[#MAX_TEXTURE_SLOTS#];
 
 void main() {
-    FragColor = texture(u_Texture, v_TexCoord) * u_Color;
+    int index = int(v_TexIndex);
+    
+    if (index == -1) {
+        color = v_Color;
+    } else {
+        color = texture(u_Textures[index], v_TexCoord) * v_Color;
+    }
 }

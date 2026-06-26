@@ -4,9 +4,6 @@ build/
 out/
 bin/
 
-# Misc
-src/App.java
-
 # Maven local publish cache
 !gradle/wrapper/gradle-wrapper.jar
 

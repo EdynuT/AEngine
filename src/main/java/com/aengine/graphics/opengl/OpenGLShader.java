@@ -17,14 +17,28 @@ import static org.lwjgl.opengl.GL20.*;
 
 public class OpenGLShader implements ShaderAPI {
 
-    private final int programId;
+    private int programId;
     private final Map<String, Integer> uniformCache = new HashMap<>();
 
+    /**
+     * Standard path-based initialization wrapper.
+     */
     public OpenGLShader(String vertexPath, String fragmentPath) {
-        Logger.debug(Logger.System.SHADER, "Compiling pipeline shaders from targets: [Vert: %s | Frag: %s]", vertexPath, fragmentPath);
-        
-        int vert = compile(GL_VERTEX_SHADER,   FileUtils.readResource(vertexPath));
-        int frag = compile(GL_FRAGMENT_SHADER, FileUtils.readResource(fragmentPath));
+        Logger.debug(Logger.System.SHADER, "Loading pipeline shaders from paths: [Vert: %s | Frag: %s]", vertexPath, fragmentPath);
+        initFromSource(FileUtils.readResource(vertexPath), FileUtils.readResource(fragmentPath));
+    }
+
+    /**
+     * Overloaded constructor accepting raw or dynamically generated GLSL source code directly.
+     */
+    public OpenGLShader(String vertexSource, String fragmentSource, boolean isRawSource) {
+        Logger.debug(Logger.System.SHADER, "Compiling pipeline shaders from dynamic runtime raw source strings.");
+        initFromSource(vertexSource, fragmentSource);
+    }
+
+    private void initFromSource(String vertexSource, String fragmentSource) {
+        int vert = compile(GL_VERTEX_SHADER,   vertexSource);
+        int frag = compile(GL_FRAGMENT_SHADER, fragmentSource);
 
         programId = glCreateProgram();
         glAttachShader(programId, vert);

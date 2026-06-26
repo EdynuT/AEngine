@@ -16,4 +16,12 @@ public class FileUtils {
             throw new RuntimeException("Failed to read resource: " + path, e);
         }
     }
+
+
+    // Reads a shader resource and injects the dynamic max texture slots count into the source text.
+
+    public static String readAndInjectResource(String path, int maxSlots) {
+        String source = readResource(path);
+        return source.replace("#MAX_TEXTURE_SLOTS#", String.valueOf(maxSlots));
+    }
 }
