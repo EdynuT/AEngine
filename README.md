@@ -21,8 +21,14 @@ The engine is structured as a reusable library. The abstraction layer between ga
 
 ## Running the demo
 
+- Windows
 ```powershell
 .\gradlew.bat run
+```
+
+Linux
+```shell
+./gradlew clean run
 ```
 
 Opens a 1280×720 window with a blue quad centered on screen. Press **ESC** to close.
@@ -36,7 +42,7 @@ First run downloads Gradle (~130 MB). Subsequent runs start in seconds.
 ### 1. Publish to Maven Local
 
 ```powershell
-.\gradlew.bat publishToMavenLocal
+.\gradlew publishToMavenLocal
 ```
 
 This installs `com.aengine:AEngine:0.6` into `~/.m2/repository`.
