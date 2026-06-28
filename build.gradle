@@ -20,31 +20,41 @@ repositories {
 ext {
     lwjglVersion = '3.3.4'
     jomlVersion  = '1.10.5'
+    imguiVersion = '1.86.11' 
     
-    // Resolve dinamicamente os binários nativos baseando-se no OS do runtime
     String osName = System.getProperty("os.name").toLowerCase()
     if (osName.contains("win")) {
         lwjglNatives = 'natives-windows'
+        imguiPlatform = 'natives-windows'
     } else if (osName.contains("mac")) {
         lwjglNatives = 'natives-macos'
+        imguiPlatform = 'natives-macos'
     } else {
         lwjglNatives = 'natives-linux'
+        imguiPlatform = 'natives-linux'
     }
 }
 
 dependencies {
+    // Core Engine Bindings
     implementation "org.lwjgl:lwjgl:${lwjglVersion}"
     implementation "org.lwjgl:lwjgl-glfw:${lwjglVersion}"
     implementation "org.lwjgl:lwjgl-opengl:${lwjglVersion}"
     implementation "org.lwjgl:lwjgl-stb:${lwjglVersion}"
+    api "org.joml:joml:${jomlVersion}"
 
-    // Natives are runtimeOnly in the engine itself; the game project picks its own platform
+    // Dear ImGui Java Bindings
+    implementation "io.github.spair:imgui-java-binding:${imguiVersion}"
+    implementation "io.github.spair:imgui-java-lwjgl3:${imguiVersion}"
+
+    // Native Platforms Resolvers
     runtimeOnly "org.lwjgl:lwjgl:${lwjglVersion}:${lwjglNatives}"
     runtimeOnly "org.lwjgl:lwjgl-glfw:${lwjglVersion}:${lwjglNatives}"
     runtimeOnly "org.lwjgl:lwjgl-opengl:${lwjglVersion}:${lwjglNatives}"
     runtimeOnly "org.lwjgl:lwjgl-stb:${lwjglVersion}:${lwjglNatives}"
-
-    api "org.joml:joml:${jomlVersion}"
+    
+    // Native Binaries for Dear ImGui Java Bindings
+    runtimeOnly "io.github.spair:imgui-java-${imguiPlatform}:${imguiVersion}"
 }
 
 application {
@@ -59,17 +69,14 @@ run {
     ]
 }
 
-// ── Library publishing ────────────────────────────────────────────────────────
 java {
-    withSourcesJar()   // includes source code in the published artifact
+    withSourcesJar()
 }
 
 publishing {
     publications {
         mavenJava(MavenPublication) {
             from components.java
-
-            // Consumers only need implementation deps exposed via 'api'
             pom {
                 name = 'AEngine'
                 description = 'Java 2D/3D graphics engine (OpenGL 3.3 backend)'
@@ -77,6 +84,10 @@ publishing {
         }
     }
     repositories {
-        mavenLocal()   // publishes to ~/.m2/repository
+        mavenLocal()
     }
+}
+
+tasks.named('run') {
+    standardInput = System.in
 }

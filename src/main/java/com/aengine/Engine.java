@@ -1,6 +1,6 @@
 package com.aengine;
 
-import com.aengine.utils.DynamicClassLoader;
+import com.aengine.graphics.ImGuiLayer;
 import com.aengine.utils.Logger;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -14,14 +14,15 @@ public abstract class Engine {
 
     private final Window window;
     private volatile boolean running;
+    private ImGuiLayer imGuiLayer;
 
-    // Hot reload tracking state
-    private GameBehavior activeGameInstance;
+    // Hot reload infrastructure tracking placeholders (Preserved for future System hot-swaps)
     private Path targetClassPath;
     private String gameClassName;
     private long lastKnownModificationTime = 0;
     private long lastReloadCheckTime = 0;
-    private static final long CHECK_INTERVAL_MS = 1000; // Check disk changes every 1s
+    private static final long CHECK_INTERVAL_MS = 1000; 
+
 
     public Engine(String title, int width, int height) {
         this.window = new Window(title, width, height);
@@ -29,8 +30,6 @@ public abstract class Engine {
 
     /**
      * Configures the hot reload sub-system targets.
-     * @param buildDirectory Absolute or relative path to the compiled game output classes directory (e.g. "game/build/classes/java/main")
-     * @param fullyQualifiedClassName The full package + name target class (e.g. "com.mygame.AeternumClient")
      */
     public final void configureHotReload(String buildDirectory, String fullyQualifiedClassName) {
         this.gameClassName = fullyQualifiedClassName;
@@ -44,7 +43,7 @@ public abstract class Engine {
                 Logger.error(Logger.System.CORE, "Failed to resolve initial file attributes for hot reload target.");
             }
         } else {
-            Logger.warn(Logger.System.CORE, "Hot reload target bytecode file not found yet at: %s. System will wait for compilation.", targetClassPath.toAbsolutePath());
+            Logger.warn(Logger.System.CORE, "Hot reload target bytecode file not found yet at: %s.", targetClassPath.toAbsolutePath());
         }
     }
 
@@ -62,7 +61,9 @@ public abstract class Engine {
         window.init();
         Input.init(window.getHandle());
         
-        // Load initial live instance if hot reload target configuration exists
+        imGuiLayer = new ImGuiLayer();
+        imGuiLayer.init(window.getHandle());
+        
         if (gameClassName != null) {
             reloadGameCode();
         }
@@ -71,7 +72,7 @@ public abstract class Engine {
         onInit();
     }
 
-    private void loop() {
+private void loop() {
         running = true;
         long lastTime = System.nanoTime();
         
@@ -82,28 +83,31 @@ public abstract class Engine {
             float deltaTime = (now - lastTime) / 1_000_000_000.0f;
             lastTime = now;
 
-            // Non-blocking file polling to avoid frame stuttering
             long currentMillis = now / 1_000_000;
             if (currentMillis - lastReloadCheckTime > CHECK_INTERVAL_MS) {
                 checkAndHandleHotReload();
                 lastReloadCheckTime = currentMillis;
             }
 
-            Input.poll();
-            
-            // Execute client logic loop updates
-            if (activeGameInstance != null) {
-                activeGameInstance.update(deltaTime);
-            }
+            org.lwjgl.glfw.GLFW.glfwPollEvents(); 
+
+            Input.update();
             onUpdate(deltaTime);
 
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             
-            // Execute client render buffer dispatches
-            if (activeGameInstance != null) {
-                activeGameInstance.render();
-            }
             onRender();
+
+            // ImGui overlay rendering block
+            imGuiLayer.beginFrame();
+            imgui.ImGui.begin("Engine Telemetry Debugger");
+            imgui.ImGui.text(String.format("Application Performance: %.2f FPS", 1.0f / deltaTime));
+            imgui.ImGui.text(String.format("Frame Time Delta: %.4f ms", deltaTime * 1000.0f));
+            imgui.ImGui.separator();
+            imgui.ImGui.text(String.format("Hardware Mouse X: %.2f", Input.getMouseX()));
+            imgui.ImGui.text(String.format("Hardware Mouse Y: %.2f", Input.getMouseY()));
+            imgui.ImGui.end();
+            imGuiLayer.endFrame();
 
             window.swapBuffers();
         }
@@ -127,45 +131,18 @@ public abstract class Engine {
     }
 
     private void reloadGameCode() {
-        try {
-            Logger.debug(Logger.System.CORE, "Instantiating clean isolated DynamicClassLoader branch...");
-            Path rootClassDir = targetClassPath.getFileSystem().getPath(targetClassPath.toString().substring(0, targetClassPath.toString().indexOf(gameClassName.replace('.', '/'))));
-            DynamicClassLoader loader = new DynamicClassLoader(rootClassDir);
-            
-            Class<?> gameClass = loader.findClass(gameClassName);
-            if (!GameBehavior.class.isAssignableFrom(gameClass)) {
-                Logger.error(Logger.System.CORE, "Hot reload rejected: Target class '%s' does not implement GameBehavior.", gameClassName);
-                return;
-            }
-
-            GameBehavior newInstance = (GameBehavior) gameClass.getDeclaredConstructor().newInstance();
-
-            // Safely swap state machines
-            if (activeGameInstance != null) {
-                Logger.debug(Logger.System.CORE, "Executing teardown on obsolete logic instance...");
-                activeGameInstance.cleanup();
-            }
-
-            activeGameInstance = newInstance;
-            Logger.debug(Logger.System.CORE, "Bootstrapping new loaded runtime instance context...");
-            activeGameInstance.init();
-            
-            Logger.info(Logger.System.CORE, "Hot reload pipeline successfully processed target class '%s'.", gameClassName);
-            
-            // Hint JVM to garbage collect old ClassLoader and obsolete definitions immediately
-            System.gc();
-        } catch (Exception e) {
-            Logger.error(Logger.System.CORE, "Hot reload routine execution crashed. Preserving old logic instance to avoid engine collapse.");
-            e.printStackTrace();
-        }
+        // TODO: Adapt this hook to reconstruct individual ECS Systems bytecode dynamically instead of GameBehavior objects
+        Logger.debug(Logger.System.CORE, "Hot reload intercepted. Pipeline pending target conversion to pure ECS Data-Driven systems.");
     }
 
     private void cleanup() {
         Logger.info(Logger.System.CORE, "Executing engine teardown sequence...");
-        if (activeGameInstance != null) {
-            activeGameInstance.cleanup();
-        }
         onCleanup();
+        
+        if (imGuiLayer != null) {
+            imGuiLayer.cleanup();
+        }
+        
         window.cleanup();
         Logger.info(Logger.System.CORE, "Engine lifecycle shutdown complete.");
     }

@@ -46,14 +46,25 @@ public class Logger {
         if (lvl.priority >= sys.currentLevel.priority) {
             String timestamp = LocalTime.now().format(timeFormatter);
             String formattedMsg = String.format(msg, args);
-            java.lang.System.out.printf("[%s] %s%-5s%s [%-8s] %s%n", 
-                timestamp, lvl.color, lvl.name(), RESET, sys.label, formattedMsg);
+            
+            // Stack trace execution context parsing
+            StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
+            String originInfo = "Unknown.java:?";
+            
+            // Index [0] is getStackTrace, [1] is log, [2] is wrapper shortcut. Index [3] is the true invocation site.
+            if (stackTrace.length > 3) {
+                StackTraceElement caller = stackTrace[3];
+                originInfo = caller.getFileName() + ":" + caller.getLineNumber();
+            }
+
+            java.lang.System.out.printf("[%s] %s%-5s%s [%-8s] [%s] %s%n", 
+                timestamp, lvl.color, lvl.name(), RESET, sys.label, originInfo, formattedMsg);
         }
     }
 
     public static void trace(System sys, String msg, Object... args) { log(sys, Level.TRACE, msg, args); }
     public static void debug(System sys, String msg, Object... args) { log(sys, Level.DEBUG, msg, args); }
-    public static void info(System sys, String msg, Object... args)  { log(sys, Level.INFO, msg, args); }
-    public static void warn(System sys, String msg, Object... args)  { log(sys, Level.WARN, msg, args); }
+    public static void info (System sys, String msg, Object... args) { log(sys, Level.INFO,  msg, args); }
+    public static void warn (System sys, String msg, Object... args) { log(sys, Level.WARN,  msg, args); }
     public static void error(System sys, String msg, Object... args) { log(sys, Level.ERROR, msg, args); }
 }

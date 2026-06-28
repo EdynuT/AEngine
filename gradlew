@@ -23,7 +23,6 @@
 #
 ##############################################################################
 
-# Resolve o diretório real do script, seguindo symlinks
 PRG="$0"
 while [ -h "$PRG" ]; do
     ls_out=$(ls -ld "$PRG")
@@ -38,12 +37,9 @@ done
 APP_HOME=$(cd "$(dirname "$PRG")" > /dev/null 2>&1 && pwd -P)
 APP_BASE_NAME=$(basename "$0")
 
-# Opções padrão da JVM (equivalente ao DEFAULT_JVM_OPTS do .bat)
 DEFAULT_JVM_OPTS='-Dfile.encoding=UTF-8 -Xmx64m -Xms64m'
 
-# Localiza o executável Java
 if [ -n "$JAVA_HOME" ]; then
-    # Remove aspas caso existam (equivalente ao JAVA_HOME=%JAVA_HOME:"=% do .bat)
     JAVA_HOME=$(printf '%s' "$JAVA_HOME" | sed 's/"//g')
     JAVA_EXE="$JAVA_HOME/bin/java"
     if [ ! -x "$JAVA_EXE" ]; then
@@ -66,8 +62,6 @@ else
     fi
 fi
 
-# Executa o Gradle Wrapper
-# shellcheck disable=SC2086 -- expansão intencional de JAVA_OPTS e GRADLE_OPTS
 exec "$JAVA_EXE" \
     $DEFAULT_JVM_OPTS \
     $JAVA_OPTS \

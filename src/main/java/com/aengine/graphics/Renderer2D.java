@@ -1,14 +1,15 @@
 package com.aengine.graphics;
 
-import com.aengine.utils.FileUtils;
-import com.aengine.utils.Logger;
 import org.joml.Matrix4f;
 import org.joml.Vector2f;
 import org.joml.Vector4f;
+import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL20;
+import com.aengine.utils.FileUtils;
+import com.aengine.utils.Logger;
 
 public class Renderer2D {
 
-    // Batch constraints
     private static final int MAX_QUADS = 1000;
     private static final int VERTICES_PER_QUAD = 4;
     private static final int INDICES_PER_QUAD = 6;
@@ -22,13 +23,15 @@ public class Renderer2D {
     private static RendererAPI renderer; 
     private static ShaderAPI   batchShader;
 
-    // RAM Cache allocation
     private static float[] vertexBuffer;
     private static int     vertexCount = 0;
     private static int     indexCount  = 0;
 
     private static TextureAPI[] textureSlots;
     private static int          textureSlotIndex = 0;
+
+    // Allocation-free static math transformations
+    private static final Matrix4f transformMatrix = new Matrix4f();
 
     private static final Vector4f[] LOCAL_VERTEX_POSITIONS = {
         new Vector4f(-0.5f, -0.5f, 0.0f, 1.0f),
@@ -47,24 +50,23 @@ public class Renderer2D {
     public static void init() {
         Logger.info(Logger.System.RENDERER, "Initializing decoupled 2D Batch Renderer pipeline...");
 
-        // 1. Instantiate the graphics context driver using the Abstract Factory pattern
         renderer = RenderContext.createRenderer();
         renderer.init();
         
-        // TODO: Move texture slots query constraint directly into the RenderAPI layer
-        maxTextureSlots = 32; 
+        int[] maxSlots = new int[1];
+        GL11.glGetIntegerv(GL20.GL_MAX_TEXTURE_IMAGE_UNITS, maxSlots);
+        maxTextureSlots = maxSlots[0]; 
+        
+        Logger.info(Logger.System.RENDERER, "Hardware Texture Slots identified: %d units available.", maxTextureSlots);
 
-        // 2. Read, inject physical slots count, and compile dynamic sources
         String vertSrc = FileUtils.readResource("/shaders/opengl/texture.vert");
         String fragSrc = FileUtils.readAndInjectResource("/shaders/opengl/texture.frag", maxTextureSlots);
         
         batchShader = RenderContext.createShader(vertSrc, fragSrc, true);
 
-        // 3. Initialize CPU heap memory block lines
         vertexBuffer = new float[MAX_VERTICES * VERTEX_SIZE_FLOATS];
         textureSlots = new TextureAPI[maxTextureSlots];
         
-        // Delegate low-level GPU buffer allocation requests entirely to the active driver context
         renderer.initBatchBuffers(MAX_VERTICES, MAX_INDICES, VERTEX_SIZE_FLOATS);
 
         Logger.info(Logger.System.RENDERER, "Batch storage allocations verified. Capable of %d quads per draw call.", MAX_QUADS);
@@ -74,7 +76,6 @@ public class Renderer2D {
         batchShader.bind();
         batchShader.setMat4("u_ViewProjection", camera.getViewProjection());
         
-        // Populate samplers array sequentially matching the current dynamic texture layout size
         for (int i = 0; i < maxTextureSlots; i++) {
             batchShader.setInt("u_Textures[" + i + "]", i);
         }
@@ -96,19 +97,15 @@ public class Renderer2D {
     public static void flush() {
         if (indexCount == 0) return;
 
-        // Bind active textures to their calculated pipeline slots
+        // Sequentially bind texture units to hardware slots before draw execution
         for (int i = 0; i < textureSlotIndex; i++) {
             textureSlots[i].bind(i);
         }
 
-        // Slice array sequence to upload only populated frame geometry elements
-        float[] activeVertices = new float[vertexCount];
-        System.arraycopy(vertexBuffer, 0, activeVertices, 0, vertexCount);
-
         batchShader.bind();
         
-        // Dispatch geometry arrays to hardware lines without revealing driver specifics
-        renderer.drawBatch(activeVertices, vertexCount, indexCount);
+        // Zero-allocation buffer pass: streaming raw pointer boundaries directly
+        renderer.drawBatch(vertexBuffer, vertexCount, indexCount);
 
         batchShader.unbind();
     }
@@ -151,12 +148,13 @@ public class Renderer2D {
             }
         }
 
-        Matrix4f transform = new Matrix4f()
-            .translate(position.x, position.y, 0.0f)
-            .scale(size.x, size.y, 1.0f);
+        // Mutate transformation data within the static matrix registry to ensure zero-heap allocation
+        transformMatrix.identity()
+                       .translate(position.x, position.y, 0.0f)
+                       .scale(size.x, size.y, 1.0f);
 
         for (int i = 0; i < VERTICES_PER_QUAD; i++) {
-            Vector4f transformedPos = new Vector4f(LOCAL_VERTEX_POSITIONS[i]).mul(transform);
+            Vector4f transformedPos = new Vector4f(LOCAL_VERTEX_POSITIONS[i]).mul(transformMatrix);
 
             int baseIndex = vertexCount;
             vertexBuffer[baseIndex + 0] = transformedPos.x;
@@ -178,30 +176,29 @@ public class Renderer2D {
 
     public static void cleanup() {
         Logger.info(Logger.System.RENDERER, "Deallocating internal Batch Renderer pipeline elements...");
-        batchShader.cleanup();
-        renderer.cleanup();
+        if (batchShader != null) 
+            batchShader.cleanup();
+        if (renderer != null)
+            renderer.cleanup();
     }
 
     public static void setClearColor(float r, float g, float b, float a) {
         renderer.setClearColor(new Vector4f(r, g, b, a));
     }
-
-    static float[] getVertexBuffer() { return vertexBuffer; }
-    static int getVertexCount() { return vertexCount; }
-    static void setVertexCount(int count) { vertexCount = count; }
-    static int getIndexCount() { return indexCount; }
-    static void setIndexCount(int count) { indexCount = count; }
-
-    static float getOrCreateTextureIndex(TextureAPI texture) {
+    
+    public static float getOrCreateTextureIndex(TextureAPI texture) {
         if (texture == null) return -1.0f;
         
+        // Linear cache scan to find already bound hardware asset handles
         for (int i = 0; i < textureSlotIndex; i++) {
-            if (textureSlots[i].getID() == texture.getID()) return (float) i;
+            if (textureSlots[i].getID() == texture.getID()) {
+                return (float) i;
+            }
         }
 
+        // Trigger a pipeline flush if maximum physical texture allocation is reached during execution
         if (textureSlotIndex >= maxTextureSlots) {
-            flush();
-            startBatch();
+            nextBatch();
         }
         
         textureSlots[textureSlotIndex] = texture;
@@ -209,4 +206,10 @@ public class Renderer2D {
         textureSlotIndex++;
         return index;
     }
+
+    static float[] getVertexBuffer() { return vertexBuffer; }
+    static int getVertexCount() { return vertexCount; }
+    static void setVertexCount(int count) { vertexCount = count; }
+    static int getIndexCount() { return indexCount; }
+    static void setIndexCount(int count) { indexCount = count; }
 }
