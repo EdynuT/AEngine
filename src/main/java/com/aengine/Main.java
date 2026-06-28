@@ -22,7 +22,7 @@ public class Main extends Engine {
     private int cameraEntity;
 
     public Main() {
-        super("AEngine - ECS Fly-Camera Runtime", 1280, 720);
+        super("AEngine - ECS Fly-Camera Runtime", 1920, 1080);
     }
 
     @Override
@@ -74,18 +74,49 @@ public class Main extends Engine {
 
     @Override
     protected void onRender() {
-        CameraComponent primaryCam = registry.getComponent(cameraEntity, CameraComponent.class);
-        
-        if (primaryCam != null) {
-            // Open batch buffer slice with current matrix states
-            Renderer2D.beginScene(primaryCam.camera);
+        // 1. Fetch the primary camera data structure from the ECS infrastructure dynamically
+        var cameraPool = registry.getPool(com.aengine.ecs.components.CameraComponent.class);
+        com.aengine.graphics.Camera activeCamera = null;
+
+        if (cameraPool != null) {
+            com.aengine.ecs.components.CameraComponent[] cameras = cameraPool.getRawComponents();
+            int totalCameras = cameraPool.size();
             
-            // Dispatch target component primitives down the rendering pipelines
-            renderSystem.update(registry, 0.0f);
-            
-            // Flush commands down to GPU driver memory lines
-            Renderer2D.endScene();
+            // Linear scan to extract the designated primary display perspective target
+            for (int i = 0; i < totalCameras; i++) {
+                if (cameras[i] != null && cameras[i].primary) {
+                    activeCamera = cameras[i].camera;
+                    break;
+                }
+            }
         }
+
+        // Defensive guard: Abort render operations if display server has no camera target to frame onto
+        if (activeCamera == null) {
+            return;
+        }
+
+        // 2. Enforce verified perspective view transformation matrix alignment
+        com.aengine.graphics.Renderer2D.beginScene(activeCamera);
+
+        // Fetch contiguous array of entities matching render criteria in O(1) matching line
+        var entities = registry.getEntitiesWith(
+            com.aengine.ecs.components.TransformComponent.class, 
+            com.aengine.ecs.components.SpriteComponent.class
+        );
+
+        // High-speed iteration over packed index markers
+        for (int i = 0; i < entities.size(); i++) {
+            int entityID = entities.get(i);
+            
+            var transform = registry.getComponent(entityID, com.aengine.ecs.components.TransformComponent.class);
+            var sprite = registry.getComponent(entityID, com.aengine.ecs.components.SpriteComponent.class);
+            
+            // Dispatch to hardware batch array pointers via dynamic zero-allocation bridge
+            com.aengine.graphics.Renderer2D.drawEntityQuad(transform, sprite);
+        }
+
+        com.aengine.graphics.Renderer2D.endScene();
     }
 
     @Override

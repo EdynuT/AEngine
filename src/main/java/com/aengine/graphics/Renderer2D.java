@@ -174,6 +174,50 @@ public class Renderer2D {
         indexCount += INDICES_PER_QUAD;
     }
 
+    // Static allocation-free math hooks to handle complex 2D/3D matrix rotations layout
+    private static final org.joml.Vector4f tempVertexPos = new org.joml.Vector4f();
+
+    /**
+     * Specialized ECS integration path. Evaluates packed component data arrays sequentially 
+     * without creating auxiliary wrapper objects during batch submission.
+     */
+    public static void drawEntityQuad(com.aengine.ecs.components.TransformComponent transform, com.aengine.ecs.components.SpriteComponent sprite) {
+        if (indexCount >= MAX_INDICES) {
+            nextBatch();
+        }
+
+        // Fetch dynamic hardware texture slot mappings via pre-existing optimized cache scanner
+        float textureIndex = getOrCreateTextureIndex(sprite.texture);
+
+        // Enforce strict zero-allocation matrix construction
+        // Z-axis is used here as a layered depth sorting channel to prevent pixel overlapping artifacts
+        transformMatrix.identity()
+                       .translate(transform.position.x, transform.position.y, transform.position.z)
+                       .rotateZ((float) Math.toRadians(transform.rotation.z)) // Absolute rotation support for 2D sprites
+                       .scale(transform.scale.x, transform.scale.y, 1.0f);
+
+        for (int i = 0; i < VERTICES_PER_QUAD; i++) {
+            // Stream position values into shared static vector container to shield L1 cache from object allocation
+            tempVertexPos.set(LOCAL_VERTEX_POSITIONS[i]).mul(transformMatrix);
+
+            int baseIndex = vertexCount;
+            vertexBuffer[baseIndex + 0] = tempVertexPos.x;
+            vertexBuffer[baseIndex + 1] = tempVertexPos.y;
+            vertexBuffer[baseIndex + 2] = tempVertexPos.z; // Layer depth channel injected into rendering pipeline
+            vertexBuffer[baseIndex + 3] = LOCAL_UV_COORDS[i].x;
+            vertexBuffer[baseIndex + 4] = LOCAL_UV_COORDS[i].y;
+            vertexBuffer[baseIndex + 5] = sprite.color.x;
+            vertexBuffer[baseIndex + 6] = sprite.color.y;
+            vertexBuffer[baseIndex + 7] = sprite.color.z;
+            vertexBuffer[baseIndex + 8] = sprite.color.w;
+            vertexBuffer[baseIndex + 9] = textureIndex;
+
+            vertexCount += VERTEX_SIZE_FLOATS;
+        }
+
+        indexCount += INDICES_PER_QUAD;
+    }
+
     public static void cleanup() {
         Logger.info(Logger.System.RENDERER, "Deallocating internal Batch Renderer pipeline elements...");
         if (batchShader != null) 

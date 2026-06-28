@@ -9,10 +9,9 @@ bin/
 
 # IDE
 .vscode/
+.vscode/*
 .idea/
 *.iml
-.vscode/settings.json
-.vscode/tasks.json
 
 # OS
 Thumbs.db

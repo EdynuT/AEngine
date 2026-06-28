@@ -2,6 +2,7 @@ package com.aengine;
 
 import com.aengine.graphics.ImGuiLayer;
 import com.aengine.utils.Logger;
+import com.aengine.ecs.Registry; // Bound architecture mapping
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -16,21 +17,23 @@ public abstract class Engine {
     private volatile boolean running;
     private ImGuiLayer imGuiLayer;
 
-    // Hot reload infrastructure tracking placeholders (Preserved for future System hot-swaps)
+    // Strict global data store context binding
+    protected final Registry registry; 
+
+    // Hot reload infrastructure tracking placeholders
     private Path targetClassPath;
     private String gameClassName;
     private long lastKnownModificationTime = 0;
     private long lastReloadCheckTime = 0;
     private static final long CHECK_INTERVAL_MS = 1000; 
 
+    private com.aengine.editor.SceneHierarchyPanel hierarchyPanel;
 
     public Engine(String title, int width, int height) {
         this.window = new Window(title, width, height);
+        this.registry = new Registry(); // Centralizes baseline ECS lifecycle memory context
     }
 
-    /**
-     * Configures the hot reload sub-system targets.
-     */
     public final void configureHotReload(String buildDirectory, String fullyQualifiedClassName) {
         this.gameClassName = fullyQualifiedClassName;
         this.targetClassPath = Paths.get(buildDirectory).resolve(fullyQualifiedClassName.replace('.', '/') + ".class");
@@ -63,6 +66,9 @@ public abstract class Engine {
         
         imGuiLayer = new ImGuiLayer();
         imGuiLayer.init(window.getHandle());
+
+        // Safe registration tracking passing the correctly initialized engine registry context
+        hierarchyPanel = new com.aengine.editor.SceneHierarchyPanel(registry);
         
         if (gameClassName != null) {
             reloadGameCode();
@@ -72,7 +78,7 @@ public abstract class Engine {
         onInit();
     }
 
-private void loop() {
+    private void loop() {
         running = true;
         long lastTime = System.nanoTime();
         
@@ -98,8 +104,44 @@ private void loop() {
             
             onRender();
 
-            // ImGui overlay rendering block
+            // ImGui pipeline framing
             imGuiLayer.beginFrame();
+            
+            // 1. MAIN MENU BAR & DOCKSPACE HOSTER (Corrected Spair package routing)
+            int windowFlags = imgui.flag.ImGuiWindowFlags.MenuBar | imgui.flag.ImGuiWindowFlags.NoDocking;
+            imgui.ImGuiViewport viewport = imgui.ImGui.getMainViewport(); // Elevated to root package
+            
+            imgui.ImGui.setNextWindowPos(viewport.getWorkPosX(), viewport.getWorkPosY());
+            imgui.ImGui.setNextWindowSize(viewport.getWorkSizeX(), viewport.getWorkSizeY());
+            imgui.ImGui.setNextWindowViewport(viewport.getID());
+            
+            int hostFlags = imgui.flag.ImGuiWindowFlags.NoTitleBar | imgui.flag.ImGuiWindowFlags.NoCollapse 
+                          | imgui.flag.ImGuiWindowFlags.NoResize | imgui.flag.ImGuiWindowFlags.NoMove 
+                          | imgui.flag.ImGuiWindowFlags.NoBringToFrontOnFocus | imgui.flag.ImGuiWindowFlags.NoNavFocus;
+
+            imgui.ImGui.begin("Editor Workspace Hoster", new imgui.type.ImBoolean(true), windowFlags | hostFlags);
+            
+            // Render Global Menu Bar
+            if (imgui.ImGui.beginMainMenuBar()) {
+                if (imgui.ImGui.beginMenu("File")) {
+                    if (imgui.ImGui.menuItem("Exit", "Alt+F4")) stop();
+                    imgui.ImGui.endMenu();
+                }
+                if (imgui.ImGui.beginMenu("Entity")) {
+                    if (imgui.ImGui.menuItem("Create Empty Entity")) {
+                        int newEntity = registry.createEntity();
+                        registry.addComponent(newEntity, new com.aengine.ecs.components.TransformComponent());
+                    }
+                    imgui.ImGui.endMenu();
+                }
+                imgui.ImGui.endMainMenuBar();
+            }
+
+            // Enable central docking node
+            imgui.ImGui.dockSpace(imgui.ImGui.getID("WorkspaceDockspace"));
+            imgui.ImGui.end(); // Closes Hoster Window
+            
+            // 2. PANEL RENDERING
             imgui.ImGui.begin("Engine Telemetry Debugger");
             imgui.ImGui.text(String.format("Application Performance: %.2f FPS", 1.0f / deltaTime));
             imgui.ImGui.text(String.format("Frame Time Delta: %.4f ms", deltaTime * 1000.0f));
@@ -107,6 +149,9 @@ private void loop() {
             imgui.ImGui.text(String.format("Hardware Mouse X: %.2f", Input.getMouseX()));
             imgui.ImGui.text(String.format("Hardware Mouse Y: %.2f", Input.getMouseY()));
             imgui.ImGui.end();
+            
+            hierarchyPanel.onImGuiRender(); 
+            
             imGuiLayer.endFrame();
 
             window.swapBuffers();
@@ -131,7 +176,6 @@ private void loop() {
     }
 
     private void reloadGameCode() {
-        // TODO: Adapt this hook to reconstruct individual ECS Systems bytecode dynamically instead of GameBehavior objects
         Logger.debug(Logger.System.CORE, "Hot reload intercepted. Pipeline pending target conversion to pure ECS Data-Driven systems.");
     }
 

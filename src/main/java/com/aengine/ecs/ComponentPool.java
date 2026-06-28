@@ -15,9 +15,9 @@ public final class ComponentPool<T> {
     @SuppressWarnings("unchecked")
     public ComponentPool(Class<?> type) {
         this.componentType = type;
-        this.denseComponents = (T[]) Array.newInstance(type, 1024);
-        this.denseToEntity = new int[1024];
-        this.entityToDense = new int[1024];
+        this.denseComponents = (T[]) Array.newInstance(type, 128); // Smaller cold initial footprint
+        this.denseToEntity = new int[128];
+        this.entityToDense = new int[1024]; // Sparse lookup array starts reasonably sized
         Arrays.fill(entityToDense, -1);
     }
 
@@ -25,13 +25,15 @@ public final class ComponentPool<T> {
      * Maps an entity ID to a packed dense array index slot in O(1).
      */
     public void put(int entity, T component) {
-        ensureCapacity(entity);
+        ensureSparseCapacity(entity);
 
-        if (entityToDense[entity] != -1) {
-            Logger.trace(Logger.System.CORE, "Overwriting component data at dense index: %d for Entity: %d", entityToDense[entity], entity);
-            denseComponents[entityToDense[entity]] = component;
+        int existingIndex = entityToDense[entity];
+        if (existingIndex != -1) {
+            denseComponents[existingIndex] = component;
             return;
         }
+
+        ensureDenseCapacity();
 
         int index = size;
         denseComponents[index] = component;
@@ -48,22 +50,21 @@ public final class ComponentPool<T> {
      */
     public void remove(int entity) {
         if (entity >= entityToDense.length || entityToDense[entity] == -1) {
-            Logger.warn(Logger.System.CORE, "Bypassing component data removal. Entity ID %d has no binding in pool: %s", entity, componentType.getSimpleName());
             return;
         }
 
         int indexToRemove = entityToDense[entity];
         int lastIndex = size - 1;
 
-        // Move last element into the deleted element slot position
         T lastComponent = denseComponents[lastIndex];
         int lastEntity = denseToEntity[lastIndex];
 
+        // Swap execution sequence
         denseComponents[indexToRemove] = lastComponent;
         denseToEntity[indexToRemove] = lastEntity;
         entityToDense[lastEntity] = indexToRemove;
 
-        // Nullify trailing dangling pointers
+        // Clean stale reference hooks for GC leverage
         denseComponents[lastIndex] = null;
         entityToDense[entity] = -1;
         size--;
@@ -78,17 +79,36 @@ public final class ComponentPool<T> {
         return denseComponents[entityToDense[entity]];
     }
 
-    private void ensureCapacity(int entity) {
+    public boolean has(int entity) {
+        if (entity >= entityToDense.length) return false;
+        return entityToDense[entity] != -1;
+    }
+
+    /**
+     * Resizes the sparse lookup mapping array based strictly on maximum Entity ID bounds.
+     */
+    private void ensureSparseCapacity(int entity) {
         if (entity >= entityToDense.length) {
             int oldCapacity = entityToDense.length;
             int newLength = Math.max(entity + 1, oldCapacity * 2);
             
-            Logger.debug(Logger.System.CORE, "Resizing component sparse lookup hardware mapping table. Capacity: %d -> %d", oldCapacity, newLength);
-            
             entityToDense = Arrays.copyOf(entityToDense, newLength);
-            denseToEntity = Arrays.copyOf(denseToEntity, newLength);
-            denseComponents = Arrays.copyOf(denseComponents, newLength);
             Arrays.fill(entityToDense, oldCapacity, newLength, -1);
+            
+            Logger.debug(Logger.System.CORE, "Resized sparse layout tracking matrix. Capacity: %d -> %d", oldCapacity, newLength);
+        }
+    }
+
+    /**
+     * Resizes the dense arrays independently when memory block thresholds are exhausted.
+     */
+    private void ensureDenseCapacity() {
+        if (size >= denseComponents.length) {
+            int newLength = denseComponents.length * 2;
+            denseComponents = Arrays.copyOf(denseComponents, newLength);
+            denseToEntity = Arrays.copyOf(denseToEntity, newLength);
+            
+            Logger.debug(Logger.System.CORE, "Resized contiguous dense infrastructure for type [%s]: %d allocation blocks.", componentType.getSimpleName(), newLength);
         }
     }
 
