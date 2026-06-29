@@ -3,23 +3,28 @@ package com.aengine;
 import com.aengine.graphics.Renderer2D;
 import com.aengine.graphics.Renderer3D;
 import com.aengine.utils.FileSystem;
+import com.aengine.utils.Logger;
 import com.aengine.utils.ProjectWizard;
-import com.aengine.ecs.Registry;
 import com.aengine.ecs.components.TransformComponent;
 import com.aengine.ecs.components.CameraComponent;
 import com.aengine.ecs.components.SpriteComponent;
 import com.aengine.ecs.systems.CameraSystem;
-import com.aengine.ecs.systems.RenderSystem;
+import org.joml.Vector2f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 
 public class Main extends Engine {
 
-    private Registry registry;
     private CameraSystem cameraSystem;
-    private RenderSystem renderSystem;
-    
     private int cameraEntity;
+
+    // Allocation-free temporary structural containers for environmental layout
+    private static final Vector2f GROUND_POSITION = new Vector2f(0.0f, -1.5f); 
+    private static final Vector2f GROUND_SIZE     = new Vector2f(5000.0f, 5000.0f);    
+    private static final Vector4f GROUND_COLOR    = new Vector4f(0.35f, 0.35f, 0.36f, 1.0f); // Slate Light Gray Floor
+
+    // Shared execution state capturing target path sent from external process host
+    private static String activeProjectPath;
 
     public Main() {
         super("AEngine - ECS Fly-Camera Runtime", 1920, 1080);
@@ -27,31 +32,30 @@ public class Main extends Engine {
 
     @Override
     protected void onInit() {
-        String parentPath = System.getProperty("user.home"); 
-        String projectName = "AeternumSandbox";
+        Logger.info(Logger.System.CORE, "Initializing core pipeline execution context...");
 
+        // Mount Virtual File System using the path provided by Tauri handshake
         try {
-            String activeProjectPath = ProjectWizard.createProject(parentPath, projectName);
+            Logger.info(Logger.System.CORE, "Target asset workspace resolution: " + activeProjectPath);
             FileSystem.mountProject(activeProjectPath);
         } catch (Exception e) {
-            FileSystem.mountProject(parentPath + "/" + projectName);
+            Logger.error(Logger.System.CORE, "VFS Handshake critical failure. Falling back to default root storage mapping.");
+            FileSystem.mountProject(System.getProperty("user.home") + "/AeternumSandbox");
         }
 
         Renderer2D.init();
         Renderer3D.init();
-        Renderer2D.setClearColor(0.02f, 0.02f, 0.04f, 1.0f);
         
-        // Lock cursor lines to handle continuous mouse delta look arrays correctly
-        Input.setCursorMode(false); 
+        // Atmospheric sky blue background clear color registration
+        Renderer2D.setClearColor(0.45f, 0.65f, 0.85f, 1.0f);
+        org.lwjgl.opengl.GL11.glEnable(org.lwjgl.opengl.GL11.GL_DEPTH_TEST);
 
-        registry = new Registry();
         cameraSystem = new CameraSystem();
-        renderSystem = new RenderSystem();
 
-        // 1. Spawn the dynamic flight camera entity
+        // 1. Spawn the dynamic flight camera entity into the shared engine ecosystem
         cameraEntity = registry.createEntity();
         registry.addComponent(cameraEntity, new TransformComponent(new Vector3f(0.0f, 0.0f, 5.0f)));
-        registry.addComponent(cameraEntity, new CameraComponent(45.0f, 1280.0f, 720.0f, 0.1f, 100.0f, true));
+        registry.addComponent(cameraEntity, new CameraComponent(45.0f, 1920.0f, 1080.0f, 0.1f, 100.0f, true));
 
         // 2. Spawn static world assets for spatial evaluation mapping
         for (int i = 0; i < 3; i++) {
@@ -74,7 +78,6 @@ public class Main extends Engine {
 
     @Override
     protected void onRender() {
-        // 1. Fetch the primary camera data structure from the ECS infrastructure dynamically
         var cameraPool = registry.getPool(com.aengine.ecs.components.CameraComponent.class);
         com.aengine.graphics.Camera activeCamera = null;
 
@@ -82,7 +85,6 @@ public class Main extends Engine {
             com.aengine.ecs.components.CameraComponent[] cameras = cameraPool.getRawComponents();
             int totalCameras = cameraPool.size();
             
-            // Linear scan to extract the designated primary display perspective target
             for (int i = 0; i < totalCameras; i++) {
                 if (cameras[i] != null && cameras[i].primary) {
                     activeCamera = cameras[i].camera;
@@ -91,28 +93,27 @@ public class Main extends Engine {
             }
         }
 
-        // Defensive guard: Abort render operations if display server has no camera target to frame onto
         if (activeCamera == null) {
             return;
         }
 
-        // 2. Enforce verified perspective view transformation matrix alignment
         com.aengine.graphics.Renderer2D.beginScene(activeCamera);
 
-        // Fetch contiguous array of entities matching render criteria in O(1) matching line
+        // --- RENDER ENVIRONMENT ENVIRONMENT (THE GROUND) ---
+        com.aengine.graphics.Renderer2D.drawQuad(GROUND_POSITION, GROUND_SIZE, GROUND_COLOR);
+
+        // --- RENDER ECS DYNAMIC ENTITIES SET ---
         var entities = registry.getEntitiesWith(
             com.aengine.ecs.components.TransformComponent.class, 
             com.aengine.ecs.components.SpriteComponent.class
         );
 
-        // High-speed iteration over packed index markers
         for (int i = 0; i < entities.size(); i++) {
             int entityID = entities.get(i);
             
             var transform = registry.getComponent(entityID, com.aengine.ecs.components.TransformComponent.class);
             var sprite = registry.getComponent(entityID, com.aengine.ecs.components.SpriteComponent.class);
             
-            // Dispatch to hardware batch array pointers via dynamic zero-allocation bridge
             com.aengine.graphics.Renderer2D.drawEntityQuad(transform, sprite);
         }
 
@@ -121,11 +122,21 @@ public class Main extends Engine {
 
     @Override
     protected void onCleanup() {
+        Logger.info(Logger.System.CORE, "Terminating active workspace runtime contexts. Executing hardware cleanup...");
         Renderer3D.cleanup();
         Renderer2D.cleanup();
     }
 
     public static void main(String[] args) {
+        // Evaluate input arguments dispatched by the Rust process wrapper
+        if (args.length > 0 && args[0] != null && !args[0].trim().isEmpty()) {
+            activeProjectPath = args[0];
+        } else {
+            // Default decoupled fallback to prevent JVM execution crash during standalone testing
+            activeProjectPath = System.getProperty("user.home") + "/AeternumSandbox";
+            Logger.warn(Logger.System.CORE, "No host initialization parameters detected. Binding fallback workspace: " + activeProjectPath);
+        }
+
         new Main().run();
     }
 }

@@ -1,8 +1,8 @@
 package com.aengine;
 
-import com.aengine.graphics.ImGuiLayer;
+import com.aengine.graphics.FrameBuffer;
 import com.aengine.utils.Logger;
-import com.aengine.ecs.Registry; // Bound architecture mapping
+import com.aengine.ecs.Registry;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -15,23 +15,22 @@ public abstract class Engine {
 
     private final Window window;
     private volatile boolean running;
-    private ImGuiLayer imGuiLayer;
+    private FrameBuffer frameBuffer;
 
-    // Strict global data store context binding
     protected final Registry registry; 
 
-    // Hot reload infrastructure tracking placeholders
     private Path targetClassPath;
     private String gameClassName;
     private long lastKnownModificationTime = 0;
     private long lastReloadCheckTime = 0;
     private static final long CHECK_INTERVAL_MS = 1000; 
 
-    private com.aengine.editor.SceneHierarchyPanel hierarchyPanel;
+    public enum EngineState { LAUNCHER, EDITOR }
+    private EngineState currentState = EngineState.LAUNCHER; 
 
     public Engine(String title, int width, int height) {
         this.window = new Window(title, width, height);
-        this.registry = new Registry(); // Centralizes baseline ECS lifecycle memory context
+        this.registry = new Registry(); 
     }
 
     public final void configureHotReload(String buildDirectory, String fullyQualifiedClassName) {
@@ -63,13 +62,9 @@ public abstract class Engine {
         Logger.info(Logger.System.CORE, "Initializing core engine components...");
         window.init();
         Input.init(window.getHandle());
-        
-        imGuiLayer = new ImGuiLayer();
-        imGuiLayer.init(window.getHandle());
 
-        // Safe registration tracking passing the correctly initialized engine registry context
-        hierarchyPanel = new com.aengine.editor.SceneHierarchyPanel(registry);
-        
+        frameBuffer = new FrameBuffer(1920, 1080);
+
         if (gameClassName != null) {
             reloadGameCode();
         }
@@ -82,7 +77,7 @@ public abstract class Engine {
         running = true;
         long lastTime = System.nanoTime();
         
-        Logger.info(Logger.System.CORE, "Engine main loop engaged.");
+        Logger.info(Logger.System.CORE, "Engine main loop engaged. Systems initialized successfully.");
 
         while (running && !window.shouldClose()) {
             long now = System.nanoTime();
@@ -96,67 +91,19 @@ public abstract class Engine {
             }
 
             org.lwjgl.glfw.GLFW.glfwPollEvents(); 
-
             Input.update();
-            onUpdate(deltaTime);
 
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-            
-            onRender();
-
-            // ImGui pipeline framing
-            imGuiLayer.beginFrame();
-            
-            // 1. MAIN MENU BAR & DOCKSPACE HOSTER (Corrected Spair package routing)
-            int windowFlags = imgui.flag.ImGuiWindowFlags.MenuBar | imgui.flag.ImGuiWindowFlags.NoDocking;
-            imgui.ImGuiViewport viewport = imgui.ImGui.getMainViewport(); // Elevated to root package
-            
-            imgui.ImGui.setNextWindowPos(viewport.getWorkPosX(), viewport.getWorkPosY());
-            imgui.ImGui.setNextWindowSize(viewport.getWorkSizeX(), viewport.getWorkSizeY());
-            imgui.ImGui.setNextWindowViewport(viewport.getID());
-            
-            int hostFlags = imgui.flag.ImGuiWindowFlags.NoTitleBar | imgui.flag.ImGuiWindowFlags.NoCollapse 
-                          | imgui.flag.ImGuiWindowFlags.NoResize | imgui.flag.ImGuiWindowFlags.NoMove 
-                          | imgui.flag.ImGuiWindowFlags.NoBringToFrontOnFocus | imgui.flag.ImGuiWindowFlags.NoNavFocus;
-
-            imgui.ImGui.begin("Editor Workspace Hoster", new imgui.type.ImBoolean(true), windowFlags | hostFlags);
-            
-            // Render Global Menu Bar
-            if (imgui.ImGui.beginMainMenuBar()) {
-                if (imgui.ImGui.beginMenu("File")) {
-                    if (imgui.ImGui.menuItem("Exit", "Alt+F4")) stop();
-                    imgui.ImGui.endMenu();
-                }
-                if (imgui.ImGui.beginMenu("Entity")) {
-                    if (imgui.ImGui.menuItem("Create Empty Entity")) {
-                        int newEntity = registry.createEntity();
-                        registry.addComponent(newEntity, new com.aengine.ecs.components.TransformComponent());
-                    }
-                    imgui.ImGui.endMenu();
-                }
-                imgui.ImGui.endMainMenuBar();
+            if (currentState == EngineState.EDITOR) {
+                onUpdate(deltaTime);
+                frameBuffer.bind();
+                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+                onRender();
+                frameBuffer.unbind();
             }
 
-            // Enable central docking node
-            imgui.ImGui.dockSpace(imgui.ImGui.getID("WorkspaceDockspace"));
-            imgui.ImGui.end(); // Closes Hoster Window
-            
-            // 2. PANEL RENDERING
-            imgui.ImGui.begin("Engine Telemetry Debugger");
-            imgui.ImGui.text(String.format("Application Performance: %.2f FPS", 1.0f / deltaTime));
-            imgui.ImGui.text(String.format("Frame Time Delta: %.4f ms", deltaTime * 1000.0f));
-            imgui.ImGui.separator();
-            imgui.ImGui.text(String.format("Hardware Mouse X: %.2f", Input.getMouseX()));
-            imgui.ImGui.text(String.format("Hardware Mouse Y: %.2f", Input.getMouseY()));
-            imgui.ImGui.end();
-            
-            hierarchyPanel.onImGuiRender(); 
-            
-            imGuiLayer.endFrame();
-
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             window.swapBuffers();
         }
-        
         Logger.info(Logger.System.CORE, "Break condition detected. Terminating main loop...");
     }
 
@@ -183,21 +130,16 @@ public abstract class Engine {
         Logger.info(Logger.System.CORE, "Executing engine teardown sequence...");
         onCleanup();
         
-        if (imGuiLayer != null) {
-            imGuiLayer.cleanup();
-        }
-        
+        if (frameBuffer != null) frameBuffer.cleanup();
         window.cleanup();
+        
         Logger.info(Logger.System.CORE, "Engine lifecycle shutdown complete.");
     }
 
-    public final void stop() { 
-        running = false; 
-    }
-    
-    public Window getWindow() { 
-        return window; 
-    }
+    public final void stop() { running = false; }
+    public Window getWindow() { return window; }
+    public Registry getRegistry() { return registry; }
+    public void setEngineState(EngineState state) { this.currentState = state; }
 
     protected abstract void onInit();
     protected abstract void onUpdate(float deltaTime);
