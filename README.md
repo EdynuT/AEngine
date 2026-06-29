@@ -86,12 +86,12 @@ Windows requires the Microsoft Edge WebView2 runtime (usually pre-installed on W
   winget install Microsoft.VisualStudio.2022.BuildTools --override "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
   ```
 
-Install tauri-cli for inteface development
+  Install tauri-cli for inteface development
   ```powershell
   cargo install tauri-cli --version "^2.0.0"
   ```
 
-If you use Node
+  If you use Node
   ```powershell
   npm install -g @tauri-apps/cli@next
   ```
@@ -106,7 +106,7 @@ If you use Node
   sudo pacman -S tauri-cli
   ```
 
-Or you can install via Cargo
+  Or you can install via Cargo
 
   ```bash
   cargo install tauri-cli --version "^2.0.0"
@@ -123,7 +123,7 @@ Or you can install via Cargo
   cargo install tauri-cli --version "^2.0.0"
   ```
 
-NPM alternative if you use Node
+  NPM alternative if you use Node
 
   ```bash
   npm install -g @tauri-apps/cli@next
@@ -135,7 +135,7 @@ To kickstart the Tauri v2 Hub Wizard in development mode (which automatically wa
   ```bash
   tauri dev
   ```
-**Note:** If you installed via `cargo install`, the bare alias might require you to run `cargo tauri dev`, which works natively and identically across all platforms.
+  **Note:** If you installed via `cargo install`, the bare alias might require you to run `cargo tauri dev`, which works natively and identically across all platforms.
 
 Compiling build for final distribuition (.msi, .exe, .deb, AppImage):
 
@@ -143,7 +143,7 @@ Compiling build for final distribuition (.msi, .exe, .deb, AppImage):
   tauri build
   ```
 
-Or
+  Or
 
   ```bash
   cargo tauri build
