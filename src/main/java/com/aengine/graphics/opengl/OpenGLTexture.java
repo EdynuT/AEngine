@@ -4,7 +4,6 @@ import com.aengine.graphics.TextureAPI;
 import com.aengine.utils.FileSystem;
 import com.aengine.utils.Logger;
 import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL12;
 import org.lwjgl.opengl.GL13;
 import org.lwjgl.opengl.GL30;
 import org.lwjgl.stb.STBImage;

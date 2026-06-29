@@ -2,13 +2,16 @@ package com.aengine;
 
 import com.aengine.graphics.Renderer2D;
 import com.aengine.graphics.Renderer3D;
+import com.aengine.utils.ProjectWizard;
 import com.aengine.utils.FileSystem;
 import com.aengine.utils.Logger;
-import com.aengine.utils.ProjectWizard;
 import com.aengine.ecs.components.TransformComponent;
 import com.aengine.ecs.components.CameraComponent;
 import com.aengine.ecs.components.SpriteComponent;
 import com.aengine.ecs.systems.CameraSystem;
+
+import java.io.File;
+
 import org.joml.Vector2f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
@@ -27,20 +30,30 @@ public class Main extends Engine {
     private static String activeProjectPath;
 
     public Main() {
-        super("AEngine - ECS Fly-Camera Runtime", 1920, 1080);
+        super("AEngine - ECS Fly-Camera Runtime");
     }
 
     @Override
     protected void onInit() {
         Logger.info(Logger.System.CORE, "Initializing core pipeline execution context...");
 
-        // Mount Virtual File System using the path provided by Tauri handshake
+        // Resolve active directory or deploy development workspace bootstrap
+        if (activeProjectPath == null || activeProjectPath.trim().isEmpty()) {
+            activeProjectPath = System.getProperty("user.home") + File.separator + "AeternumSandbox";
+        }
+
         try {
-            Logger.info(Logger.System.CORE, "Target asset workspace resolution: " + activeProjectPath);
+            java.io.File projectDir = new java.io.File(activeProjectPath);
+            if (!projectDir.exists() || !projectDir.isDirectory()) {
+                Logger.warn(Logger.System.CORE, "Target workspace not found. Deploying Project Wizard Bootstrap at: " + activeProjectPath);
+                // Dynamically build the ProjectRoot layout structures (.aengine/, assets/, config/)
+                ProjectWizard.createProject(System.getProperty("user.home"), "AeternumSandbox");
+            }
+            
             FileSystem.mountProject(activeProjectPath);
         } catch (Exception e) {
-            Logger.error(Logger.System.CORE, "VFS Handshake critical failure. Falling back to default root storage mapping.");
-            FileSystem.mountProject(System.getProperty("user.home") + "/AeternumSandbox");
+            Logger.error(Logger.System.CORE, "VFS Handshake critical failure. Halting engine initialization pipeline.");
+            throw new RuntimeException("Critical core infrastructure failure during VFS mount", e);
         }
 
         Renderer2D.init();
@@ -133,7 +146,12 @@ public class Main extends Engine {
             activeProjectPath = args[0];
         } else {
             // Default decoupled fallback to prevent JVM execution crash during standalone testing
-            activeProjectPath = System.getProperty("user.home") + "/AeternumSandbox";
+            String os = System.getProperty("os.name").toLowerCase();
+            if (os.contains("win")) {
+                activeProjectPath = System.getProperty("user.home") + "\\AeternumSandbox";
+            } else {
+                activeProjectPath = System.getProperty("user.home") + "/AeternumSandbox";
+            }
             Logger.warn(Logger.System.CORE, "No host initialization parameters detected. Binding fallback workspace: " + activeProjectPath);
         }
 

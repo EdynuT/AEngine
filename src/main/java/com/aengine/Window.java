@@ -16,10 +16,8 @@ public class Window {
     private int    height;
     private long   handle;
 
-    public Window(String title, int width, int height) {
+    public Window(String title) {
         this.title  = title;
-        this.width  = width;
-        this.height = height;
     }
 
     public void init() {
@@ -42,6 +40,21 @@ public class Window {
         glfwWindowHint(GLFW_VISIBLE,   GLFW_FALSE);
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
+        // --- DYNAMIC HARDWARE RESOLUTION INTERCEPTION ---
+        long primaryMonitor = glfwGetPrimaryMonitor();
+        if (primaryMonitor != NULL) {
+            GLFWVidMode vidMode = glfwGetVideoMode(primaryMonitor);
+            if (vidMode != null) {
+                // Mutate standard settings
+                width = vidMode.width();
+                height = vidMode.height();
+                Logger.info(Logger.System.WINDOW, "Hardware display metrics detected: %dx%d", width, height);
+            }
+        }
+
+        // Force window to start maximized to avoid ugly borders or incorrect centering styles
+        glfwWindowHint(GLFW_MAXIMIZED, GLFW_TRUE);
+
         Logger.debug(Logger.System.WINDOW, "Instantiating native window '%s' (%dx%d)...", title, width, height);
         handle = glfwCreateWindow(width, height, title, NULL, NULL);
         if (handle == NULL) {
@@ -56,9 +69,9 @@ public class Window {
             Logger.trace(Logger.System.WINDOW, "Viewport hardware sync updated to: %dx%d", w, h);
         });
 
-        // Safe positioning block — evaluated only after valid window context instantiation
+        // Safe positioning block — evaluated only if not running borderless fullscreen modes
         if (glfwGetPlatform() != GLFW_PLATFORM_WAYLAND) {
-            GLFWVidMode vidMode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+            GLFWVidMode vidMode = glfwGetVideoMode(primaryMonitor);
             if (vidMode != null) {
                 glfwSetWindowPos(handle,
                     (vidMode.width()  - width)  / 2,
@@ -74,7 +87,7 @@ public class Window {
         Logger.info(Logger.System.RENDERER, "Binding LWJGL OpenGL capabilities to current hardware thread...");
         GL.createCapabilities();
 
-        // Query driver telemetry metadata to intercept Mesa/AMD specific bugs
+        // Query driver telemetry metadata to intercept Mesa/AMD or legacy Intel specific bugs
         String vendor   = glGetString(GL_VENDOR);
         String renderer = glGetString(GL_RENDERER);
         String version  = glGetString(GL_VERSION);
@@ -103,7 +116,6 @@ public class Window {
             glfwDestroyWindow(handle);
         }
         glfwTerminate();
-        
         glfwSetErrorCallback(null);
         Logger.info(Logger.System.WINDOW, "GLFW lifecycle terminated successfully.");
     }
