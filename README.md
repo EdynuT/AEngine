@@ -51,19 +51,19 @@ ProjectRoot/
 ## Running the Development Workspace
 Clone the repository to your workspace
 
-- **Windows**
-```powershell
-git clone https://github.com/EdynuT/AEngine.git
+* **Windows**
+  ```powershell
+  git clone https://github.com/EdynuT/AEngine.git
+  
+  cd .\path\to\AEngine
+  ```
 
-cd .\path\to\AEngine
-```
+* **Linux**
+  ```bash
+  git clone https://github.com/EdynuT/AEngine.git
 
-- **Linux**
-```bash
-git clone https://github.com/EdynuT/AEngine.git
-
-cd ./path/to/AEngine
-```
+  cd ./path/to/AEngine
+  ```
 
 ### Prerequisites
 
@@ -150,7 +150,7 @@ The framework dynamically switches execution pipelines at startup using JVM comm
 To kickstart the Tauri v2 Hub Wizard in development mode (which automatically watches for changes in both the Rust backend and the HTML/CSS frontend assets):
 
 * **1. Running the Interface**
-  
+
   ```bash
   tauri dev
   ```
