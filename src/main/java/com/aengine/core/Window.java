@@ -1,4 +1,4 @@
-package com.aengine;
+package com.aengine.core;
 
 import com.aengine.graphics.HardwareCapabilities;
 import com.aengine.utils.Logger;

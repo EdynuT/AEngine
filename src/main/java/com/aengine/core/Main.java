@@ -1,22 +1,20 @@
-package com.aengine;
-
-import com.aengine.graphics.Renderer2D;
-import com.aengine.graphics.Renderer3D;
-import com.aengine.graphics.TextureAPI;
-import com.aengine.graphics.opengl.OpenGLTexture;
-import com.aengine.graphics.Camera;
-import com.aengine.utils.ProjectWizard;
-import com.aengine.utils.FileSystem;
-import com.aengine.utils.Logger;
-import com.aengine.ecs.components.TransformComponent;
-import com.aengine.ecs.components.CameraComponent;
-import com.aengine.ecs.components.SpriteComponent;
-import com.aengine.ecs.systems.CameraSystem;
+package com.aengine.core;
 
 import java.io.File;
 
 import org.joml.Vector3f;
 import org.joml.Vector4f;
+
+import com.aengine.ecs.components.CameraComponent;
+import com.aengine.ecs.components.SpriteComponent;
+import com.aengine.ecs.components.TransformComponent;
+import com.aengine.ecs.systems.CameraSystem;
+import com.aengine.graphics.Camera;
+import com.aengine.graphics.Renderer2D;
+import com.aengine.graphics.Renderer3D;
+import com.aengine.utils.FileSystem;
+import com.aengine.utils.Logger;
+import com.aengine.utils.ProjectWizard;
 
 public class Main extends Engine {
 
@@ -28,7 +26,7 @@ public class Main extends Engine {
 
     // Allocation-free temporary structural containers for 3D physical environment alignment
     private static final Vector3f GROUND_POSITION = new Vector3f(0.0f, -1.5f, 0.0f); 
-    private static final Vector3f GROUND_SIZE = new Vector3f(1024.0f, 1.0f, 1024.0f); // 32 bit limit
+    private static final Vector3f GROUND_SIZE = new Vector3f(1024.0f, 1.0f, 1024.0f);
     private static final Vector4f GROUND_COLOR    = new Vector4f(0.50f, 0.50f, 0.50f, 1.0f); // Light Gray Floor
 
     // Shared execution state capturing target path sent from external process host
@@ -58,6 +56,7 @@ public class Main extends Engine {
             String rawAssetsDir = activeProjectPath + File.separator + "assets" + File.separator + "src";
             String vfsAssetsDir = activeProjectPath + File.separator + "assets" + File.separator + "baked";
             com.aengine.utils.AssetBaker.bakeDirectory(rawAssetsDir, vfsAssetsDir);
+            com.aengine.utils.AssetWatcher.start(activeProjectPath); 
             com.aengine.network.TelemetryServer.start();
         } catch (Exception e) {
             Logger.error(Logger.System.CORE, "VFS Handshake critical failure. Halting engine initialization pipeline.");
@@ -74,24 +73,14 @@ public class Main extends Engine {
         cameraSystem = new CameraSystem();
         cameraEntity = registry.createEntity();
         
-        // O AJUSTE ESTÁ AQUI: 
-        // Se for 3D, a câmara recua 5 metros. Se for 2D, ela fica no Z=0 junto com os sprites.
+        // If is 3D, the camera recedes 5 meters. If is 2D, it stays at Z=0 along with the sprites.
         float cameraZ = (activeRenderMode == RenderMode.MODE_3D) ? 5.0f : 0.0f;
         registry.addComponent(cameraEntity, new TransformComponent(new Vector3f(0.0f, 0.0f, cameraZ)));
 
         if (activeRenderMode == RenderMode.MODE_3D) {
             Logger.info(Logger.System.RENDERER, "Enforcing Core 3D Perspective execution pipeline.");
             org.lwjgl.opengl.GL11.glEnable(org.lwjgl.opengl.GL11.GL_DEPTH_TEST);
-            
-            // True activates 3D Perspective projection matrix calculation inside CameraComponent
             registry.addComponent(cameraEntity, new CameraComponent(45.0f, getWindow().getWidth(), getWindow().getHeight(), 0.1f, 1000.0f, true));
-            
-            // Spawn static world assets scattered across X and Z planes for depth testing
-            for (int i = 0; i < 3; i++) {
-                int entity = registry.createEntity();
-                registry.addComponent(entity, new TransformComponent(new Vector3f(i * 2.5f - 2.5f, 0.0f, -i * 2.0f)));
-                registry.addComponent(entity, new SpriteComponent(new Vector4f(0.2f, 0.5f, i * 0.3f + 0.3f, 1.0f)));
-            }
         } else {
             Logger.info(Logger.System.RENDERER, "Enforcing Core 2D Orthographic execution pipeline. Z-Axis dropped.");
             org.lwjgl.opengl.GL11.glDisable(org.lwjgl.opengl.GL11.GL_DEPTH_TEST);
@@ -99,15 +88,8 @@ public class Main extends Engine {
             // False enforces 2D Orthographic projection matrix calculation, dropping spatial depth distortions
             registry.addComponent(cameraEntity, new CameraComponent(0.0f, getWindow().getWidth(), getWindow().getHeight(), -1.0f, 100.0f, false));
             
-            // Spawn static world assets locked at Z = 0.0f to prevent pipeline artifacts
-            for (int i = 0; i < 3; i++) {
-                int entityID = registry.createEntity();
-                registry.addComponent(entityID, new TransformComponent(new Vector3f(i * 2.5f - 2.5f, 0.0f, 0.0f))); // Colocados lado a lado no eixo X, no Z = 0.0f
-                TextureAPI texture = new OpenGLTexture("assets://baked/textures/caixa.atex");
-                SpriteComponent sprite = new SpriteComponent(new Vector4f(1.0f, 1.0f, 1.0f, 1.0f));
-                sprite.texture = texture;
-                registry.addComponent(entityID, sprite);
-            }
+            // HARDWARE CONTEXT: Data-Driven Instantiation
+            com.aengine.ecs.serialization.SceneLoader.load(registry, "assets://data/scenes/level_01.scene");
         }
     }
 

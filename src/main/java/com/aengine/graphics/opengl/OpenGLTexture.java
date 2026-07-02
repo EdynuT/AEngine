@@ -152,6 +152,11 @@ public class OpenGLTexture implements TextureAPI {
          * Executed on the Main Thread the very first time the Renderer requests this texture.
          */
         if (currentState == STATE_DECODED && decodedPixels != null) {
+            
+            // Injection of warning outside the Hot Path (Executes only once during JIT Upload)
+            if (width > 4096 || height > 4096) {
+                Logger.warn(Logger.System.ASSET, "Performance Warning: Texture [ID: %d] payload is heavy (%dx%d px). Consider utilizing the AEngine optimization pipeline to compress this asset into a native block format.", id, width, height);
+            }
             GL11.glBindTexture(GL11.GL_TEXTURE_2D, id);
             
             GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, GL11.GL_REPEAT);
@@ -191,6 +196,20 @@ public class OpenGLTexture implements TextureAPI {
             }
             decodedPixels = null;
         }
+    }
+
+    /**
+     * Re-submits the pipeline payload to the Thread Pool. 
+     * The Main Thread will automatically catch the STATE_DECODED flag and overwrite the VRAM block.
+     */
+    public void reload(String virtualPath) {
+        if (uploadState.get() == STATE_LOADING) return; // Prevent race conditions from duplicate saves in the image editor
+        
+        uploadState.set(STATE_LOADING);
+        Logger.info(Logger.System.ASSET, "Hot-Reload Signal caught. Re-streaming asset: %s", virtualPath);
+        
+        // Offloads decoding to the background cores.
+        ASSET_STREAMING_POOL.submit(() -> loadAndDecode(virtualPath));
     }
 
     @Override 

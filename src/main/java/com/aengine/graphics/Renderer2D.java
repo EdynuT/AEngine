@@ -225,17 +225,18 @@ public class Renderer2D {
         int textureHeight = texture.getHeight();
         int maxHardwareSize = HardwareCapabilities.getMaxTextureSize();
 
-        if (textureWidth > 4096 || textureHeight > 4096) {
-            Logger.warn(Logger.System.RENDERER, 
-                "Performance Warning: Texture [ID: %d] payload is heavy (%dx%d px). " +
-                "Consider utilizing the AEngine optimization pipeline to compress this asset into a native block format.",
-                texture.getID(), textureWidth, textureHeight
-            );
-        }
+        // Kinda buggy. The log appears multiple times if the texture is too big, but it is not a problem - just a warning (very annoying tho)
+        // if (textureWidth > 4096 || textureHeight > 4096) {
+        //     Logger.warn(Logger.System.RENDERER, 
+        //         "Performance Warning: Texture [ID: %d] payload is heavy (%dx%d px). " +
+        //         "Consider utilizing the AEngine optimization pipeline to compress this asset into a native block format.",
+        //         texture.getID(), textureWidth, textureHeight
+        //     );
+        // }
 
         if (textureWidth > maxHardwareSize || textureHeight > maxHardwareSize) {
-            Logger.error(Logger.System.RENDERER, 
-                "Hardware Limit Violation: Texture [ID: %d] size (%dx%d px) exceeds maximum GPU capabilities (%dx%d px). Rejection imminent.",
+            Logger.warn(Logger.System.RENDERER, 
+                "Hardware Limit: Texture [ID: %d] size (%dx%d px) exceeds maximum GPU capabilities (%dx%d px). This might cause rendering issues.",
                 texture.getID(), textureWidth, textureHeight, maxHardwareSize, maxHardwareSize
             );
         }

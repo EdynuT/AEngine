@@ -244,7 +244,7 @@ To kickstart the Tauri v2 Hub Wizard in development mode (which automatically wa
 
 - [ ] Data-Driven Scene & Prefab Architecture: Implement deterministic JSON parsers (using libraries like Gson/Jackson) to instantiate ECS components dynamically from `.entity` and `.scene` files, completely decoupling level design from hardcoded Java execution.
 
-- [ ] Kernel-Level Asset Hot-Reloading: Deploy an OS-level `WatchService` (inotify/ReadDirectoryChangesW) daemon on the `assets_src` directory to trigger automatic recompilation via `AssetBaker` and instant VRAM injection during runtime with zero polling overhead.
+- [x] Kernel-Level Asset Hot-Reloading: Deploy an OS-level `WatchService` (inotify/ReadDirectoryChangesW) daemon on the `assets_src` directory to trigger automatic recompilation via `AssetBaker` and instant VRAM injection during runtime with zero polling overhead.
 
 - [ ] Tauri WebKit Editor Dashboard: Finalize the Rust/Svelte (or Vue/React) frontend wrapper to intercept the 10Hz TCP telemetry loopback, visualizing real-time ECS allocation metrics, FPS graphs, and intercepted Logger streams.
 

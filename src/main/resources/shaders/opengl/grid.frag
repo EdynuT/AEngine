@@ -26,12 +26,14 @@ void main() {
     vec4 finalColor = u_GridColor;
 
     // Calculate alpha for each grid level
-    float alpha1  = getGrid(coord, 1.0, deriv)  * smoothstep(40.0, 10.0, depth);
-    float alpha4  = getGrid(coord, 4.0, deriv)  * smoothstep(200.0, 50.0, depth);
-    float alpha16 = getGrid(coord, 16.0, deriv) * smoothstep(900.0, 200.0, depth);
+    float alpha1  = getGrid(coord, 1.0, deriv)  * smoothstep(30.0, 10.0, depth);
+    float alpha4  = getGrid(coord, 4.0, deriv)  * smoothstep(100.0, 50.0, depth);
+    float alpha8  = getGrid(coord, 8.0, deriv)  * smoothstep(300.0, 100.0, depth);
+    float alpha16 = getGrid(coord, 16.0, deriv) * smoothstep(800.0, 300.0, depth);
+    float alpha32 = getGrid(coord, 32.0, deriv) * smoothstep(2000.0, 800.0, depth);
 
     // Accumulate the grid lines
-    float totalAlpha = clamp(alpha1 + alpha4 + alpha16, 0.0, 1.0);
+    float totalAlpha = clamp(alpha1 + alpha4 + alpha16 + alpha32, 0.0, 1.0);
     finalColor = mix(finalColor, vec4(0.0, 0.0, 0.0, 1.0), totalAlpha * 0.5);
 
     // World Axis Origin lines

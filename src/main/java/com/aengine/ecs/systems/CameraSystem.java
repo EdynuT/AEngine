@@ -1,8 +1,8 @@
 package com.aengine.ecs.systems;
 
-import com.aengine.Input;
-import com.aengine.Keys;
-import com.aengine.Main; // Importado para acessar o RenderMode
+import com.aengine.core.Input;
+import com.aengine.core.Keys;
+import com.aengine.core.Main;
 import com.aengine.ecs.ComponentPool;
 import com.aengine.ecs.Registry;
 import com.aengine.ecs.System;

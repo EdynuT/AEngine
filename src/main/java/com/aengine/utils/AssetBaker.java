@@ -83,7 +83,7 @@ public final class AssetBaker {
         }
     }
 
-    private static boolean compileTexture(File sourceFile, File rootSourceDir, File rootTargetDir) {
+    public static boolean compileTexture(File sourceFile, File rootSourceDir, File rootTargetDir) {
         // Replicate internal folder hierarchy in the target VFS
         String relativePath = sourceFile.getAbsolutePath().substring(rootSourceDir.getAbsolutePath().length());
         String targetExtensionPath = relativePath.substring(0, relativePath.lastIndexOf('.')) + ".atex";
