@@ -111,3 +111,6 @@ For actions that require direct state mutation (e.g., changing an entity's posit
 - Decoupled State: The Java Core is the ultimate source of truth. If the frontend crashes, the game loop must continue running. If the Java Core crashes, the frontend should display a "Connection Lost" overlay.
 
 - UI Layout: The dashboard should feature modular panes (e.g., a Profiler for FPS, an ECS Inspector, and a real-time Console). Design the components to accept rapid data updates (10 times a second) without causing excessive DOM reflows.
+
+## Committing
+All interface update must be done on the `features/ui-launcher` branch.
