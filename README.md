@@ -171,7 +171,7 @@ To kickstart the Tauri v2 Hub Wizard in development mode (which automatically wa
   ```bash
   tauri dev
   ```
-  **Note:** If you installed via `cargo install`, the bare alias might require you to run `cargo tauri dev`, which works natively and identically across all platforms.
+  **_Note:_** If you installed via `cargo install`, the bare alias might require you to run `cargo tauri dev`, which works natively and identically across all platforms.
 
 * **2. Compiling for Distribuition:**
 
@@ -184,6 +184,8 @@ To kickstart the Tauri v2 Hub Wizard in development mode (which automatically wa
   ```bash
   cargo tauri build
   ```
+
+  **_Note:_** For more information about interface updates check [docs/FRONTEND_INTEGRATION.md](docs/FRONTEND_INTEGRATION.md)
 
 ---
 
